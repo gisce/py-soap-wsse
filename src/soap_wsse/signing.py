@@ -88,7 +88,7 @@ class SignQueue(object):
             node = set_algorithm(transforms, 'Transform', C14N)
 
             elm = _create_element(node, 'ec:InclusiveNamespaces', nsmap)
-            elm.set('PrefixList', 'urn')
+            elm.set('PrefixList', 'wsse soap-env')
 
             set_algorithm(reference, 'DigestMethod', XMLDSIG_SHA1)
             etree.SubElement(reference, self.DS_DIGEST_VALUE)
@@ -105,7 +105,7 @@ def sign_envelope(envelope, key_file):
     security_node = ensure_security_header(doc, queue)
     security_token_node = create_binary_security_token(key_file)
     signature_node = Signature(
-        xmlsec.TransformExclC14N, xmlsec.TransformRsaSha1)
+        xmlsec.TransformExclC14N, xmlsec.TransformRsaSha1, nsPrefix=True)
 
     security_node.append(security_token_node)
     security_node.append(signature_node)
@@ -130,8 +130,8 @@ def sign_envelope_with_timestamp(envelope, timestamp_node, key_file):
     queue.push_and_mark(body)
 
     security_node = ensure_security_header(doc, queue)
-    security_token_node = create_binary_security_token(key_file)
-    signature_node = xmlsec_Signature(
+    security_token_node = create_binary_security_token(key_file, id_name='X509')
+    signature_node = Signature(
         xmlsec.TransformExclC14N, xmlsec.TransformRsaSha1)
 
     security_node.append(security_token_node)
@@ -216,14 +216,16 @@ def create_key_info_node(security_token):
     return key_info
 
 
-def create_binary_security_token(key_file):
+def create_binary_security_token(key_file, id_name='id'):
     """Create the BinarySecurityToken node containing the x509 certificate.
 
     """
+    idname = id_name
+
     node = etree.Element(
         ns_id('BinarySecurityToken', ns.wssens),
         nsmap={ns.wssens[0]: ns.wssens[1]})
-    node.set(ns_id('Id', ns.wsuns), get_unique_id())
+    node.set(ns_id(idname, ns.wsuns), get_unique_id())
     node.set('EncodingType', ns.wssns[1] + 'Base64Binary')
     node.set('ValueType', BINARY_TOKEN_TYPE)
 
