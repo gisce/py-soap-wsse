@@ -121,6 +121,37 @@ def sign_envelope(envelope, key_file):
     dsigCtx.sign(signature_node)
     return etree.tostring(doc)
 
+def sign_envelope_with_timestamp(envelope, timestamp_node, key_file):
+    """Sign the given soap request with the given key"""
+    doc = etree.fromstring(envelope)
+    body = get_body(doc)
+
+    queue = SignQueue()
+    queue.push_and_mark(body)
+
+    security_node = ensure_security_header(doc, queue)
+    security_token_node = create_binary_security_token(key_file)
+    signature_node = xmlsec_Signature(
+        xmlsec.TransformExclC14N, xmlsec.TransformRsaSha1)
+
+    security_node.append(security_token_node)
+    security_node.append(signature_node)
+    queue.push_and_mark(timestamp_node)
+    security_node.append(timestamp_node)
+    queue.insert_references(signature_node)
+
+    key_info = create_key_info_node(security_token_node)
+    queue.push_and_mark(key_info)
+    queue.push_and_mark(signature_node)
+    signature_node.append(key_info)
+
+    # Sign the generated xml
+    xmlsec.addIDs(doc, ['Id'])
+    dsigCtx = xmlsec.DSigCtx()
+    dsigCtx.signKey = xmlsec.Key.load(
+        key_file, xmlsec.KeyDataFormatPem, None)
+    dsigCtx.sign(signature_node)
+    return etree.tostring(doc)
 
 def verify_envelope(reply, key_file):
     """Verify that the given soap request is signed with the certificate"""
